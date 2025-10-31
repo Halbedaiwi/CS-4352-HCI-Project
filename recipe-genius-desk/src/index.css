@@ -1,0 +1,141 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Definition of the design system. All colors, gradients, fonts, etc should be defined here. 
+All colors MUST be HSL.
+*/
+
+@layer base {
+  :root {
+    --background: 0 0% 100%;
+    --foreground: 150 8% 15%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 150 8% 15%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 150 8% 15%;
+
+    /* Fresh sage green - healthy, food-focused */
+    --primary: 150 35% 45%;
+    --primary-foreground: 0 0% 100%;
+    
+    /* Warm amber - cooking, energy */
+    --secondary: 35 85% 55%;
+    --secondary-foreground: 0 0% 100%;
+
+    --muted: 150 15% 95%;
+    --muted-foreground: 150 8% 45%;
+
+    /* Cool blue - organization, trust */
+    --accent: 210 75% 55%;
+    --accent-foreground: 0 0% 100%;
+
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 150 15% 88%;
+    --input: 150 15% 88%;
+    --ring: 150 35% 45%;
+
+    --radius: 0.75rem;
+    
+    /* Custom tokens for meal app */
+    --sage-light: 150 25% 92%;
+    --sage-medium: 150 30% 65%;
+    --amber-light: 35 75% 90%;
+    --blue-light: 210 70% 92%;
+    
+    /* Nutrition colors */
+    --nutrition-protein: 210 75% 55%;
+    --nutrition-carbs: 35 85% 55%;
+    --nutrition-fiber: 150 35% 45%;
+    --nutrition-calories: 25 75% 50%;
+    
+    /* Status colors */
+    --status-use-soon: 35 90% 50%;
+    --status-fresh: 150 50% 45%;
+    --status-frozen: 210 60% 50%;
+    --status-canned: 25 60% 45%;
+
+    --sidebar-background: 0 0% 98%;
+
+    --sidebar-foreground: 240 5.3% 26.1%;
+
+    --sidebar-primary: 240 5.9% 10%;
+
+    --sidebar-primary-foreground: 0 0% 98%;
+
+    --sidebar-accent: 240 4.8% 95.9%;
+
+    --sidebar-accent-foreground: 240 5.9% 10%;
+
+    --sidebar-border: 220 13% 91%;
+
+    --sidebar-ring: 217.2 91.2% 59.8%;
+  }
+
+  .dark {
+    --background: 150 10% 8%;
+    --foreground: 150 5% 95%;
+
+    --card: 150 8% 12%;
+    --card-foreground: 150 5% 95%;
+
+    --popover: 150 8% 12%;
+    --popover-foreground: 150 5% 95%;
+
+    --primary: 150 35% 55%;
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 35 75% 50%;
+    --secondary-foreground: 0 0% 100%;
+
+    --muted: 150 10% 18%;
+    --muted-foreground: 150 8% 65%;
+
+    --accent: 210 70% 55%;
+    --accent-foreground: 0 0% 100%;
+
+    --destructive: 0 75% 45%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 150 10% 22%;
+    --input: 150 10% 22%;
+    --ring: 150 35% 55%;
+    
+    --sage-light: 150 12% 20%;
+    --sage-medium: 150 20% 35%;
+    --amber-light: 35 65% 25%;
+    --blue-light: 210 60% 25%;
+    
+    --nutrition-protein: 210 70% 55%;
+    --nutrition-carbs: 35 75% 50%;
+    --nutrition-fiber: 150 40% 50%;
+    --nutrition-calories: 25 70% 45%;
+    
+    --status-use-soon: 35 80% 45%;
+    --status-fresh: 150 45% 45%;
+    --status-frozen: 210 55% 50%;
+    --status-canned: 25 55% 45%;
+    --sidebar-background: 240 5.9% 10%;
+    --sidebar-foreground: 240 4.8% 95.9%;
+    --sidebar-primary: 224.3 76.3% 48%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 240 3.7% 15.9%;
+    --sidebar-accent-foreground: 240 4.8% 95.9%;
+    --sidebar-border: 240 3.7% 15.9%;
+    --sidebar-ring: 217.2 91.2% 59.8%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+  }
+}
