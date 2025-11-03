@@ -46,6 +46,8 @@ const CookingMode = ({ recipe, onExit }: CookingModeProps) => {
     setCompletedSteps(prev => new Set([...prev, currentStep]));
     if (currentStep < recipe.steps.length - 1) {
       setCurrentStep(prev => prev + 1);
+    } else {
+      onExit();
     }
   };
 

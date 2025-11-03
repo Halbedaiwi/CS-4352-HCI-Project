@@ -27,9 +27,7 @@ const RecipeDetail = ({ recipe, onBack, onStartCooking }: RecipeDetailProps) => 
       <div className="grid lg:grid-cols-1 gap-6">
         <div className="lg:col-span-1 space-y-6">
           <Card>
-            <div className="h-64 bg-gradient-to-br from-primary/20 to-accent/20 flex items-center justify-center">
-              <div className="text-8xl">🍽️</div>
-            </div>
+            <img src={recipe.image} alt={recipe.name} className="h-64 w-full object-cover" />
             <CardHeader>
               <div className="space-y-4">
                 <div className="flex items-start justify-between">
