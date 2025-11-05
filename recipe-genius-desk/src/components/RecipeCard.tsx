@@ -8,9 +8,10 @@ interface RecipeCardProps {
   recipe: Recipe;
   compact?: boolean;
   onViewDetails?: (recipe: Recipe) => void;
+  onAddToWeeklyPlanner?: (recipe: Recipe) => void;
 }
 
-const RecipeCard = ({ recipe, compact = false, onViewDetails }: RecipeCardProps) => {
+const RecipeCard = ({ recipe, compact = false, onViewDetails, onAddToWeeklyPlanner }: RecipeCardProps) => {
   const totalTime = recipe.prepTime + recipe.cookTime;
 
   return (
@@ -92,7 +93,20 @@ const RecipeCard = ({ recipe, compact = false, onViewDetails }: RecipeCardProps)
             View Details
           </Button>
         )}
-        
+        {onAddToWeeklyPlanner && (
+            <Button
+                variant="outline"
+                size="sm"
+                className="w-full"
+                onClick={(e) => {
+                    e.stopPropagation();
+                    onAddToWeeklyPlanner(recipe);
+                }}
+            >
+                <CalendarPlus className="mr-2 h-4 w-4" />
+                Add to Weekly Planner
+            </Button>
+        )}
       </CardFooter>
     </Card>
   );
