@@ -91,7 +91,7 @@ function buildImageQuery(recipe: Omit<Recipe, "id"> | Recipe): string {
   const parts: string[] = [];
   if (recipe.name) parts.push(recipe.name);
   if (recipe.culturalFlavor) parts.push(recipe.culturalFlavor);
-  // Add 2–3 salient ingredients to nudge search relevance
+  // guys, this will add 2–3 salient ingredients. its supposed to nudge search relevance (pls dont change this)
   const ingredientHints = (recipe.ingredients || [])
     .map(i => i.item)
     .filter(Boolean)
@@ -108,7 +108,7 @@ async function pickRecipeImage(recipe: Omit<Recipe, "id"> | Recipe): Promise<str
   const query = buildImageQuery(recipe);
   const img = await searchPexelsImage(query);
 
-  // If nothing returned, you could optionally retry with a simpler query:
+  // this is like in case nothin returned, which shouldnt hapnpen
   if (!img && recipe.name) {
     return searchPexelsImage(`${recipe.name} recipe`);
   }
@@ -187,7 +187,7 @@ export async function generateRecipesFromIngredients(ingredients: string[]): Pro
       cookTime: number;      // minutes
       servings: number;
       difficulty: string;    // 'Easy' | 'Medium' | 'Hard'
-      tags: string[];        // e.g., ['Vegetarian','Quick','High Protein']
+      tags: string[];        // e.g., ['Vegetarian','Quick','High Protein', 'Budget-Friendly', 'Kid-Friendly']
       ingredients: Array<{
         item: string;
         amount: number;
@@ -196,7 +196,7 @@ export async function generateRecipesFromIngredients(ingredients: string[]): Pro
       }>;
       nutrition: NutritionInfo;
       steps: string[];
-      culturalFlavor?: string; // e.g., 'Italian', 'Tex-Mex'
+      culturalFlavor: string; // e.g., 'Italian', 'Tex-Mex', 'Asian', 'Indian', 'American', 'Mediterranean', 'Fusion'
       image?: string;          // leave empty or omit; will be filled by system
     }
   `;
@@ -230,7 +230,7 @@ export async function generateRecipesFromIngredients(ingredients: string[]): Pro
     throw new Error("The AI returned an invalid recipe format.");
   }
 
-  const withIds = generated.map(r => ({ ...r, id: uuidv4() }));
+  const withIds = generated.map(r => ({ ...r, id: uuidv4(), culturalFlavor: r.culturalFlavor || 'Fusion' }));
   const images = await Promise.all(withIds.map(pickRecipeImage));
   const final = withIds.map((r, i) => ({ ...r, image: images[i] ?? r.image }));
 

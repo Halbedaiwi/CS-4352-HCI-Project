@@ -2,14 +2,29 @@ import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { RotateCcw } from 'lucide-react';
 import SnapAndSuggest from '@/components/SnapAndSuggest';
+import PlanTheWeek from '@/components/PlanTheWeek';
 import { toast } from 'sonner';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Recipe } from '@/data/mockData';
 
 const Index = () => {
   const [resetKey, setResetKey] = useState(0);
+  const [plannedRecipes, setPlannedRecipes] = useState<Recipe[]>([]);
 
   const handleReset = () => {
     setResetKey(prev => prev + 1);
+    setPlannedRecipes([]);
     toast.success('Demo data reset successfully');
+  };
+
+  const addToWeeklyPlanner = (recipe: Recipe) => {
+    setPlannedRecipes(prev => [...prev, recipe]);
+    toast.success(`${recipe.name} added to weekly planner!`);
+  };
+
+  const removeFromWeeklyPlanner = (recipe: Recipe) => {
+    setPlannedRecipes(prev => prev.filter(r => r.id !== recipe.id));
+    toast.success(`${recipe.name} removed from weekly planner!`);
   };
 
   return (
@@ -33,7 +48,18 @@ const Index = () => {
       </header>
 
       <main className="container mx-auto px-6 py-8">
-        <SnapAndSuggest key={`snap-${resetKey}`} />
+        <Tabs defaultValue="snap-and-suggest">
+          <TabsList>
+            <TabsTrigger value="snap-and-suggest">Snap & Suggest</TabsTrigger>
+            <TabsTrigger value="plan-the-week">Plan the Week</TabsTrigger>
+          </TabsList>
+          <TabsContent value="snap-and-suggest">
+            <SnapAndSuggest key={`snap-${resetKey}`} addToWeeklyPlanner={addToWeeklyPlanner} />
+          </TabsContent>
+          <TabsContent value="plan-the-week">
+            <PlanTheWeek plannedRecipes={plannedRecipes} removeFromWeeklyPlanner={removeFromWeeklyPlanner} />
+          </TabsContent>
+        </Tabs>
       </main>
     </div>
   );

@@ -1,20 +1,45 @@
 import { Card, CardContent, CardFooter, CardHeader } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Clock, Users, Flame, Drumstick, Wheat, CalendarPlus } from 'lucide-react';
+import { Clock, Users, Flame, Drumstick, Wheat, CalendarPlus, X } from 'lucide-react';
 import { Recipe } from '@/data/mockData';
 import { Button } from '@/components/ui/button';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 interface RecipeCardProps {
   recipe: Recipe;
   compact?: boolean;
   onViewDetails?: (recipe: Recipe) => void;
+  onAddToWeeklyPlanner?: (recipe: Recipe) => void;
+  isPlanning?: boolean;
+  onAssignDay?: (recipe: Recipe, day: string) => void;
+  daysOfWeek?: string[];
+  assignedDay?: string;
+  onRemoveFromDay?: (recipe: Recipe) => void;
+  onRemoveFromPlanner?: (recipe: Recipe) => void;
 }
 
-const RecipeCard = ({ recipe, compact = false, onViewDetails }: RecipeCardProps) => {
+const RecipeCard = ({ 
+  recipe, 
+  compact = false, 
+  onViewDetails, 
+  onAddToWeeklyPlanner, 
+  isPlanning = false, 
+  onAssignDay, 
+  daysOfWeek = [],
+  assignedDay,
+  onRemoveFromDay,
+  onRemoveFromPlanner
+}: RecipeCardProps) => {
   const totalTime = recipe.prepTime + recipe.cookTime;
 
+  const handleCardClick = () => {
+    if (!isPlanning && onViewDetails) {
+      onViewDetails(recipe);
+    }
+  };
+
   return (
-    <Card className="overflow-hidden hover:shadow-lg transition-all cursor-pointer group" onClick={() => onViewDetails?.(recipe)}>
+    <Card className="overflow-hidden hover:shadow-lg transition-all cursor-pointer group" onClick={handleCardClick}>
       <div className="h-32 bg-gradient-to-br from-primary/20 to-accent/20 flex items-center justify-center relative overflow-hidden">
         {recipe.image ? (
           <img src={recipe.image} alt={recipe.name} className="w-full h-full object-cover" />
@@ -92,7 +117,70 @@ const RecipeCard = ({ recipe, compact = false, onViewDetails }: RecipeCardProps)
             View Details
           </Button>
         )}
-        
+        {onAddToWeeklyPlanner && !isPlanning && (
+            <Button
+                variant="outline"
+                size="sm"
+                className="w-full"
+                onClick={(e) => {
+                    e.stopPropagation();
+                    onAddToWeeklyPlanner(recipe);
+                }}
+            >
+                <CalendarPlus className="mr-2 h-4 w-4" />
+                Add to Weekly Planner
+            </Button>
+        )}
+        {isPlanning && onAssignDay && !assignedDay && (
+          <div className="flex items-center gap-2 w-full">
+            <Select onValueChange={(day) => onAssignDay(recipe, day)} value={assignedDay}>
+              <SelectTrigger>
+                <SelectValue placeholder="Assign to a day" />
+              </SelectTrigger>
+              <SelectContent>
+                {daysOfWeek.map(day => (
+                  <SelectItem key={day} value={day} disabled={day === assignedDay}>{day}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            {onRemoveFromPlanner &&
+              <Button
+                variant="outline"
+                size="icon"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onRemoveFromPlanner(recipe);
+                }}
+              >
+                <X className="h-4 w-4" />
+              </Button>
+            }
+          </div>
+        )}
+        {isPlanning && assignedDay && onRemoveFromDay && (
+          <div className="flex items-center gap-2 w-full">
+            <Select onValueChange={(day) => onAssignDay(recipe, day)} value={assignedDay}>
+              <SelectTrigger>
+                <SelectValue placeholder="Assign to a day" />
+              </SelectTrigger>
+              <SelectContent>
+                {daysOfWeek.map(day => (
+                  <SelectItem key={day} value={day} disabled={day === assignedDay}>{day}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Button
+              variant="outline"
+              size="icon"
+              onClick={(e) => {
+                e.stopPropagation();
+                onRemoveFromDay(recipe);
+              }}
+            >
+              <X className="h-4 w-4" />
+            </Button>
+          </div>
+        )}
       </CardFooter>
     </Card>
   );
