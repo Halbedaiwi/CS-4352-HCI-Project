@@ -1,18 +1,22 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
+
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { Upload, Camera, Loader2, AlertCircle, X } from 'lucide-react';
-import { Recipe, analyzeImages, generateRecipesFromIngredients } from '@/lib/gemini';
+import CookingMode from './CookingMode';
 import RecipeCard from './RecipeCard';
 import RecipeDetail from './RecipeDetail';
-import CookingMode from './CookingMode';
+
 import { toast } from 'sonner';
+import { analyzeImages, generateRecipesFromIngredients, Recipe } from '@/lib/gemini';
+import { AlertCircle, Camera, Loader2, Upload, X } from 'lucide-react';
 
-interface SnapAndSuggestProps {}
+interface SnapAndSuggestProps {
+  addToWeeklyPlanner: (recipe: Recipe) => void;
+}
 
-const SnapAndSuggest = ({}: SnapAndSuggestProps) => {
+const SnapAndSuggest = ({ addToWeeklyPlanner }: SnapAndSuggestProps) => {
   const [imageFiles, setImageFiles] = useState<File[]>([]);
   const [imagePreviews, setImagePreviews] = useState<string[]>([]);
   const [detectedItems, setDetectedItems] = useState<string[]>([]);
@@ -22,6 +26,56 @@ const SnapAndSuggest = ({}: SnapAndSuggestProps) => {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Filters
+  const [maxTime, setMaxTime] = useState<number | null>(null);
+  const [quickFilters, setQuickFilters] = useState<string[]>([]);
+  const [culturalFlavor, setCulturalFlavor] = useState<string | null>(null);
+  const [filteredRecipes, setFilteredRecipes] = useState<Recipe[]>([]);
+  const [culturalFlavorOptions, setCulturalFlavorOptions] = useState<string[]>([]);
+
+  const quickFilterOptions = ['High Protein', 'Low Calorie', 'High Fiber'];
+
+  useEffect(() => {
+    const flavors = Array.from(new Set(suggestedRecipes.map(r => r.culturalFlavor).filter(Boolean)));
+    setCulturalFlavorOptions(flavors as string[]);
+  }, [suggestedRecipes]);
+
+  useEffect(() => {
+    const flavors = Array.from(new Set(suggestedRecipes.map(r => r.culturalFlavor).filter(Boolean)));
+    setCulturalFlavorOptions(flavors as string[]);
+  }, [suggestedRecipes]);
+
+  useEffect(() => {
+    let recipes = [...suggestedRecipes];
+
+    if (maxTime) {
+      recipes = recipes.filter(r => (r.prepTime + r.cookTime) <= maxTime);
+    }
+
+    if (quickFilters.length > 0) {
+      recipes = recipes.filter(r => {
+        return quickFilters.every(filter => {
+          if (filter === 'High Protein') {
+            return r.nutrition.protein > 20;
+          }
+          if (filter === 'Low Calorie') {
+            return r.nutrition.calories < 500;
+          }
+          if (filter === 'High Fiber') {
+            return r.nutrition.fiber > 5;
+          }
+          return true;
+        });
+      });
+    }
+
+    if (culturalFlavor) {
+      recipes = recipes.filter(r => r.culturalFlavor === culturalFlavor);
+    }
+
+    setFilteredRecipes(recipes);
+  }, [suggestedRecipes, maxTime, quickFilters, culturalFlavor]);
 
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     if (event.target.files) {
@@ -59,10 +113,11 @@ const SnapAndSuggest = ({}: SnapAndSuggestProps) => {
       } else {
         toast.warning('No ingredients were detected. Please try a different image.');
       }
-    } catch (e: any) {
+    } catch (e: unknown) {
       console.error(e);
-      setError(e.message || 'An unknown error occurred.');
-      toast.error('An error occurred', { description: e.message });
+      const message = e instanceof Error ? e.message : 'An unknown error occurred.';
+      setError(message);
+      toast.error('An error occurred', { description: message });
     } finally {
       setIsLoading(false);
     }
@@ -170,18 +225,78 @@ const SnapAndSuggest = ({}: SnapAndSuggestProps) => {
       {/* Recipe Suggestions */}
       {suggestedRecipes.length > 0 && (
         <div className="space-y-4">
-          <div className="flex items-center justify-between">
-            <h3 className="text-xl font-semibold">Recipe Suggestions</h3>
-            <p className="text-sm text-muted-foreground">Sorted by total time (prep + cook)</p>
-          </div>
+          {/* Refine Results Section */}
+          <Card className="p-6 bg-sage-light">
+            <h3 className="text-xl font-semibold mb-4">Refine Results</h3>
+            <div className="flex flex-col gap-6">
+              {/* Max Time Filter */}
+              <div>
+                <h4 className="font-medium mb-2">Max Time</h4>
+                <div className="flex flex-wrap gap-2">
+                  <Button variant={maxTime === 15 ? 'default' : 'outline'} onClick={() => setMaxTime(prev => prev === 15 ? null : 15)}>&lt;= 15min</Button>
+                  <Button variant={maxTime === 20 ? 'default' : 'outline'} onClick={() => setMaxTime(prev => prev === 20 ? null : 20)}>&lt;= 20min</Button>
+                  <Button variant={maxTime === 30 ? 'default' : 'outline'} onClick={() => setMaxTime(prev => prev === 30 ? null : 30)}>&lt;= 30min</Button>
+                  <Button variant={maxTime === null ? 'default' : 'outline'} onClick={() => setMaxTime(null)}>Any</Button>
+                </div>
+              </div>
+
+              {/* Quick Filters */}
+              <div>
+                <h4 className="font-medium mb-2">Quick Filters</h4>
+                <div className="flex flex-col gap-2">
+                  {quickFilterOptions.map(filter => (
+                    <div key={filter} className="flex items-center">
+                      <input
+                        type="checkbox"
+                        id={filter}
+                        checked={quickFilters.includes(filter)}
+                        onChange={() => {
+                          setQuickFilters(prev =>
+                            prev.includes(filter)
+                              ? prev.filter(f => f !== filter)
+                              : [...prev, filter]
+                          );
+                        }}
+                        className="mr-2 h-4 w-4"
+                      />
+                      <label htmlFor={filter}>{filter}</label>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Cultural Flavor Filter */}
+              <div>
+                <h4 className="font-medium mb-2">Cultural Flavor</h4>
+                <div className="flex flex-wrap gap-2">
+                  {culturalFlavorOptions.map(flavor => (
+                    <Button
+                      key={flavor}
+                      variant={culturalFlavor === flavor ? 'default' : 'outline'}
+                      onClick={() => setCulturalFlavor(prev => prev === flavor ? null : flavor)}
+                    >
+                      {flavor}
+                    </Button>
+                  ))}
+                  <Button
+                    variant={culturalFlavor === null ? 'default' : 'outline'}
+                    onClick={() => setCulturalFlavor(null)}
+                  >
+                    All
+                  </Button>
+                </div>
+              </div>
+            </div>
+          </Card>
           
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-            {suggestedRecipes.map(recipe => (
+            {filteredRecipes.map(recipe => (
               <RecipeCard 
                 key={recipe.id} 
                 recipe={recipe} 
                 compact 
                 onViewDetails={setSelectedRecipe}
+                onAddToWeeklyPlanner={addToWeeklyPlanner}
               />
             ))}
           </div>

@@ -4,7 +4,7 @@ import type { Recipe, NutritionInfo } from '@/data/mockData';
 const API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
 const PEXELS_API_KEY = import.meta.env.VITE_PEXELS_API_KEY;
 
-// lets go with gemini yall, its quick and cheap $$$
+// lets go with gemini yall, its quick and cheap $$
 const MODEL = "gemini-2.5-flash"; 
 
 const API_URL = `https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent?key=${API_KEY}`;
@@ -91,7 +91,7 @@ function buildImageQuery(recipe: Omit<Recipe, "id"> | Recipe): string {
   const parts: string[] = [];
   if (recipe.name) parts.push(recipe.name);
   if (recipe.culturalFlavor) parts.push(recipe.culturalFlavor);
-  // Add 2–3 salient ingredients to nudge search relevance
+  // guys, this will add 2–3 salient ingredients. its supposed to nudge search relevance (pls dont change this)
   const ingredientHints = (recipe.ingredients || [])
     .map(i => i.item)
     .filter(Boolean)
@@ -108,7 +108,7 @@ async function pickRecipeImage(recipe: Omit<Recipe, "id"> | Recipe): Promise<str
   const query = buildImageQuery(recipe);
   const img = await searchPexelsImage(query);
 
-  // If nothing returned, you could optionally retry with a simpler query:
+  // this is like in case nothin returned, which shouldnt hapnpen
   if (!img && recipe.name) {
     return searchPexelsImage(`${recipe.name} recipe`);
   }
@@ -130,22 +130,29 @@ export async function analyzeImages(imageFiles: File[]): Promise<string[]> {
   const prompt =
     "Analyze these images of a pantry, fridge, or countertop. Identify all the food ingredients you can see. Return only a comma-separated list of the ingredient names. For example: 'Canned Tomatoes,Onions,Garlic,Pasta'";
 
+  const requestBody = {
+    contents: [{ parts: [{ text: prompt }, ...imageParts] }],
+  };
+
+  console.log("Gemini API URL:", API_URL);
+  console.log("Gemini API Request Body:", JSON.stringify(requestBody, null, 2));
+
   const response = await fetch(API_URL, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      contents: [{ parts: [{ text: prompt }, ...imageParts] }],
-    }),
+    body: JSON.stringify(requestBody),
   });
 
+  console.log("Gemini API Response Status:", response.status);
+  const responseBody = await response.json();
+  console.log("Gemini API Response Body:", responseBody);
+
   if (!response.ok) {
-    const errorBody = await response.json();
-    console.error("Gemini API Error:", errorBody);
+    console.error("Gemini API Error:", responseBody);
     throw new Error(`Failed to analyze images. Status: ${response.status}`);
   }
 
-  const data = await response.json();
-  const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
+  const text = responseBody.candidates?.[0]?.content?.parts?.[0]?.text;
 
   if (!text) {
     return [];
@@ -187,7 +194,7 @@ export async function generateRecipesFromIngredients(ingredients: string[]): Pro
       cookTime: number;      // minutes
       servings: number;
       difficulty: string;    // 'Easy' | 'Medium' | 'Hard'
-      tags: string[];        // e.g., ['Vegetarian','Quick','High Protein']
+      tags: string[];        // e.g., ['Vegetarian','Quick','High Protein', 'Budget-Friendly', 'Kid-Friendly']
       ingredients: Array<{
         item: string;
         amount: number;
@@ -196,7 +203,7 @@ export async function generateRecipesFromIngredients(ingredients: string[]): Pro
       }>;
       nutrition: NutritionInfo;
       steps: string[];
-      culturalFlavor?: string; // e.g., 'Italian', 'Tex-Mex'
+      culturalFlavor: string; // e.g., 'Italian', 'Tex-Mex', 'Asian', 'Indian', 'American', 'Mediterranean', 'Fusion'
       image?: string;          // leave empty or omit; will be filled by system
     }
   `;
@@ -230,7 +237,7 @@ export async function generateRecipesFromIngredients(ingredients: string[]): Pro
     throw new Error("The AI returned an invalid recipe format.");
   }
 
-  const withIds = generated.map(r => ({ ...r, id: uuidv4() }));
+  const withIds = generated.map(r => ({ ...r, id: uuidv4(), culturalFlavor: r.culturalFlavor || 'Fusion' }));
   const images = await Promise.all(withIds.map(pickRecipeImage));
   const final = withIds.map((r, i) => ({ ...r, image: images[i] ?? r.image }));
 
@@ -318,4 +325,56 @@ export async function refineRecipe(recipe: Recipe, instruction: string): Promise
   const newId = uuidv4();
   const image = await pickRecipeImage(refined);
   return { ...refined, id: newId, image };
+}
+
+export async function swapIngredient(recipe: Recipe, oldIngredient: string, newIngredient: string): Promise<Recipe> {
+  if (!API_KEY) {
+    throw new Error("VITE_GEMINI_API_KEY is not set in .env.local");
+  }
+
+  const prompt = `
+    Given the following recipe:
+    ${JSON.stringify(recipe, null, 2)}
+
+    Swap the ingredient "${oldIngredient}" with "${newIngredient}".
+    Please update the ingredients list and the instructions to reflect this change.
+    The amounts of other ingredients and the steps should be adjusted logically to accomodate the new ingredient.
+
+    IMPORTANT:
+    - Do NOT include an image URL. Leave "image" empty or omit it; the system will add one.
+    - Return a single valid JSON object (no extra text) matching the Recipe interface.
+  `;
+
+  const response = await fetch(TEXT_API_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      contents: [{ parts: [{ text: prompt }] }],
+      generationConfig: {
+        responseMimeType: "application/json",
+      },
+    }),
+  });
+
+  if (!response.ok) {
+    const errorBody = await response.json();
+    console.error("Gemini API Error:", errorBody);
+    throw new Error(`Failed to swap ingredient. Status: ${response.status}`);
+  }
+
+  const data = await response.json();
+  const raw = data.candidates?.[0]?.content?.parts?.[0]?.text || "";
+  const jsonString = stripMarkdownFences(raw);
+
+  let swapped: Omit<Recipe, 'id'>;
+  try {
+    swapped = JSON.parse(jsonString);
+  } catch (e) {
+    console.error("Failed to parse swapped recipe JSON:", e, { jsonString });
+    throw new Error("The AI returned an invalid recipe format during ingredient swap.");
+  }
+
+  const newId = uuidv4();
+  const image = await pickRecipeImage(swapped);
+  return { ...swapped, id: newId, image };
 }

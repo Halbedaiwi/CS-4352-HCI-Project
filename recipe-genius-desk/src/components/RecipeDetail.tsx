@@ -3,8 +3,12 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Slider } from '@/components/ui/slider';
-import { ArrowLeft, Users, Clock, ChefHat } from 'lucide-react';
+import { ArrowLeft, Users, Clock, ChefHat, Replace, Loader2 } from 'lucide-react';
 import { Recipe } from '@/data/mockData';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Input } from '@/components/ui/input';
+import { swapIngredient } from '@/lib/gemini';
+import { toast } from 'sonner';
 
 interface RecipeDetailProps {
   recipe: Recipe;
@@ -12,10 +16,41 @@ interface RecipeDetailProps {
   onStartCooking: (recipe: Recipe) => void;
 }
 
-const RecipeDetail = ({ recipe, onBack, onStartCooking }: RecipeDetailProps) => {
+const RecipeDetail = ({ recipe: initialRecipe, onBack, onStartCooking }: RecipeDetailProps) => {
+  const [recipe, setRecipe] = useState(initialRecipe);
   const [servings, setServings] = useState(recipe.servings);
+  const [showSmartSwap, setShowSmartSwap] = useState(false);
+  const [ingredientToReplace, setIngredientToReplace] = useState('');
+  const [newIngredient, setNewIngredient] = useState('');
+  const [isSwapping, setIsSwapping] = useState(false);
 
   const servingsMultiplier = servings / recipe.servings;
+
+  const handleSmartSwap = async () => {
+    if (!ingredientToReplace || !newIngredient) {
+      toast.error('Please select an ingredient to replace and provide a new one.');
+      return;
+    }
+
+    setIsSwapping(true);
+    toast.info('Swapping ingredients... This may take a moment.');
+
+    try {
+      const newRecipe = await swapIngredient(recipe, ingredientToReplace, newIngredient);
+      setRecipe(newRecipe);
+      toast.success('Ingredients swapped successfully!');
+      setShowSmartSwap(false);
+      setIngredientToReplace('');
+      setNewIngredient('');
+    } catch (error) {
+      console.error(error);
+      toast.error('Failed to swap ingredients.', {
+        description: error instanceof Error ? error.message : 'An unknown error occurred.',
+      });
+    } finally {
+      setIsSwapping(false);
+    }
+  };
 
   return (
     <div className="space-y-6 max-w-4xl mx-auto">
@@ -27,9 +62,7 @@ const RecipeDetail = ({ recipe, onBack, onStartCooking }: RecipeDetailProps) => 
       <div className="grid lg:grid-cols-1 gap-6">
         <div className="lg:col-span-1 space-y-6">
           <Card>
-            <div className="h-64 bg-gradient-to-br from-primary/20 to-accent/20 flex items-center justify-center">
-              <div className="text-8xl">🍽️</div>
-            </div>
+            <img src={recipe.image} alt={recipe.name} className="h-64 w-full object-cover" />
             <CardHeader>
               <div className="space-y-4">
                 <div className="flex items-start justify-between">
@@ -45,10 +78,14 @@ const RecipeDetail = ({ recipe, onBack, onStartCooking }: RecipeDetailProps) => 
                       <Badge variant="outline">{recipe.difficulty}</Badge>
                     </div>
                   </div>
-                  <div className="flex gap-2">
+                  <div className="flex flex-col gap-2">
                     <Button onClick={() => onStartCooking(recipe)} size="lg" className="gap-2">
                       <ChefHat className="h-5 w-5" />
                       Start Cooking
+                    </Button>
+                    <Button variant="default" size="lg" onClick={() => setShowSmartSwap(!showSmartSwap)} className="gap-2 bg-blue-500 hover:bg-blue-600">
+                      <Replace className="h-5 w-5" />
+                      Smart Swap
                     </Button>
                   </div>
                 </div>
@@ -85,7 +122,34 @@ const RecipeDetail = ({ recipe, onBack, onStartCooking }: RecipeDetailProps) => 
               </div>
 
               <div>
-                <h3 className="font-semibold text-lg">Ingredients</h3>
+                <div className="flex items-center justify-between mb-2">
+                  <h3 className="font-semibold text-lg">Ingredients</h3>
+                </div>
+                {showSmartSwap && (
+                  <div className="p-4 bg-muted rounded-lg mb-4 space-y-4">
+                    <h4 className="font-semibold">Swap an Ingredient</h4>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                      <Select onValueChange={setIngredientToReplace} value={ingredientToReplace}>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select ingredient" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {recipe.ingredients.map((ing, idx) => (
+                            <SelectItem key={idx} value={ing.item}>{ing.item}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <Input
+                        placeholder="New ingredient"
+                        value={newIngredient}
+                        onChange={(e) => setNewIngredient(e.target.value)}
+                      />
+                      <Button onClick={handleSmartSwap} disabled={isSwapping}>
+                        {isSwapping ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : 'Submit'}
+                      </Button>
+                    </div>
+                  </div>
+                )}
                 <ul className="space-y-2">
                   {recipe.ingredients.map((ing, idx) => (
                     <li key={idx} className="flex items-center justify-between p-2 hover:bg-muted rounded">
