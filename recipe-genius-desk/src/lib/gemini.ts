@@ -120,18 +120,24 @@ async function pickRecipeImage(recipe: Omit<Recipe, "id"> | Recipe): Promise<str
  * @param imageFiles array of image File objects
  * @returns resolves to an array of ingredient names detected in the images
  */
-export async function analyzeImages(imageFiles: File[]): Promise<string[]> {
+export async function analyzeImages(imageFiles: File[]): Promise<Array<{ item: string; quantity: string }>> {
   if (!API_KEY) {
     throw new Error("VITE_GEMINI_API_KEY is not set in .env.local");
   }
 
   const imageParts = await Promise.all(imageFiles.map(fileToGenerativePart));
 
-  const prompt =
-    "Analyze these images of a pantry, fridge, or countertop. Identify all the food ingredients you can see. Return only a comma-separated list of the ingredient names. For example: 'Canned Tomatoes,Onions,Garlic,Pasta'";
+  const prompt = `
+    Analyze these images of a pantry, fridge, or countertop. Identify all the food ingredients you can see.
+    Return a valid JSON array of objects, where each object has an "item" (string) and a "quantity" (string).
+    For example: [{"item": "Canned Tomatoes", "quantity": "2 cans"}, {"item": "Onion", "quantity": "1"}, {"item": "Garlic", "quantity": "1 bulb"}]
+  `;
 
   const requestBody = {
     contents: [{ parts: [{ text: prompt }, ...imageParts] }],
+    generationConfig: {
+      responseMimeType: "application/json",
+    },
   };
 
   console.log("Gemini API URL:", API_URL);
@@ -158,7 +164,15 @@ export async function analyzeImages(imageFiles: File[]): Promise<string[]> {
     return [];
   }
 
-  return text.split(',').map(item => item.trim()).filter(Boolean);
+  try {
+    const jsonString = stripMarkdownFences(text);
+    const ingredients = JSON.parse(jsonString);
+    return ingredients;
+  } catch (e) {
+    console.error("Failed to parse ingredients JSON:", e, { text });
+    // Fallback for comma-separated list for backward compatibility or if the model fails
+    return text.split(',').map(item => ({ item: item.trim(), quantity: '1' })).filter(i => i.item);
+  }
 }
 
 /**

@@ -8,12 +8,29 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Recipe } from '@/data/mockData';
 
 const Index = () => {
-  const [resetKey, setResetKey] = useState(0);
   const [plannedRecipes, setPlannedRecipes] = useState<Recipe[]>([]);
 
+  // State lifted from SnapAndSuggest
+  const [imageFiles, setImageFiles] = useState<File[]>([]);
+  const [imagePreviews, setImagePreviews] = useState<string[]>([]);
+  const [detectedItems, setDetectedItems] = useState<Array<{ item: string; quantity: string }>>([]);
+  const [suggestedRecipes, setSuggestedRecipes] = useState<Recipe[]>([]);
+  const [selectedRecipe, setSelectedRecipe] = useState<Recipe | null>(null);
+  const [cookingRecipe, setCookingRecipe] = useState<Recipe | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
   const handleReset = () => {
-    setResetKey(prev => prev + 1);
     setPlannedRecipes([]);
+    // Clear lifted state
+    setImageFiles([]);
+    setImagePreviews([]);
+    setDetectedItems([]);
+    setSuggestedRecipes([]);
+    setSelectedRecipe(null);
+    setCookingRecipe(null);
+    setIsLoading(false);
+    setError(null);
     toast.success('Demo data reset successfully');
   };
 
@@ -54,10 +71,32 @@ const Index = () => {
             <TabsTrigger value="plan-the-week">Plan the Week</TabsTrigger>
           </TabsList>
           <TabsContent value="snap-and-suggest">
-            <SnapAndSuggest key={`snap-${resetKey}`} addToWeeklyPlanner={addToWeeklyPlanner} />
+            <SnapAndSuggest
+              addToWeeklyPlanner={addToWeeklyPlanner}
+              imageFiles={imageFiles}
+              setImageFiles={setImageFiles}
+              imagePreviews={imagePreviews}
+              setImagePreviews={setImagePreviews}
+              detectedItems={detectedItems}
+              setDetectedItems={setDetectedItems}
+              suggestedRecipes={suggestedRecipes}
+              setSuggestedRecipes={setSuggestedRecipes}
+              selectedRecipe={selectedRecipe}
+              setSelectedRecipe={setSelectedRecipe}
+              cookingRecipe={cookingRecipe}
+              setCookingRecipe={setCookingRecipe}
+              isLoading={isLoading}
+              setIsLoading={setIsLoading}
+              error={error}
+              setError={setError}
+            />
           </TabsContent>
           <TabsContent value="plan-the-week">
-            <PlanTheWeek plannedRecipes={plannedRecipes} removeFromWeeklyPlanner={removeFromWeeklyPlanner} />
+            <PlanTheWeek 
+              plannedRecipes={plannedRecipes} 
+              removeFromWeeklyPlanner={removeFromWeeklyPlanner}
+              detectedItems={detectedItems}
+            />
           </TabsContent>
         </Tabs>
       </main>

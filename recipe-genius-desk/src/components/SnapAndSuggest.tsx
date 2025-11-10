@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react';
+import { useRef, useEffect, useState } from 'react';
 
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
@@ -14,17 +14,43 @@ import { AlertCircle, Camera, Loader2, Upload, X } from 'lucide-react';
 
 interface SnapAndSuggestProps {
   addToWeeklyPlanner: (recipe: Recipe) => void;
+  imageFiles: File[];
+  setImageFiles: (files: File[]) => void;
+  imagePreviews: string[];
+  setImagePreviews: (previews: string[]) => void;
+  detectedItems: Array<{ item: string; quantity: string }>;
+  setDetectedItems: (items: Array<{ item: string; quantity: string }>) => void;
+  suggestedRecipes: Recipe[];
+  setSuggestedRecipes: (recipes: Recipe[]) => void;
+  selectedRecipe: Recipe | null;
+  setSelectedRecipe: (recipe: Recipe | null) => void;
+  cookingRecipe: Recipe | null;
+  setCookingRecipe: (recipe: Recipe | null) => void;
+  isLoading: boolean;
+  setIsLoading: (loading: boolean) => void;
+  error: string | null;
+  setError: (error: string | null) => void;
 }
 
-const SnapAndSuggest = ({ addToWeeklyPlanner }: SnapAndSuggestProps) => {
-  const [imageFiles, setImageFiles] = useState<File[]>([]);
-  const [imagePreviews, setImagePreviews] = useState<string[]>([]);
-  const [detectedItems, setDetectedItems] = useState<string[]>([]);
-  const [suggestedRecipes, setSuggestedRecipes] = useState<Recipe[]>([]);
-  const [selectedRecipe, setSelectedRecipe] = useState<Recipe | null>(null);
-  const [cookingRecipe, setCookingRecipe] = useState<Recipe | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+const SnapAndSuggest = ({
+  addToWeeklyPlanner,
+  imageFiles,
+  setImageFiles,
+  imagePreviews,
+  setImagePreviews,
+  detectedItems,
+  setDetectedItems,
+  suggestedRecipes,
+  setSuggestedRecipes,
+  selectedRecipe,
+  setSelectedRecipe,
+  cookingRecipe,
+  setCookingRecipe,
+  isLoading,
+  setIsLoading,
+  error,
+  setError,
+}: SnapAndSuggestProps) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Filters
@@ -35,11 +61,6 @@ const SnapAndSuggest = ({ addToWeeklyPlanner }: SnapAndSuggestProps) => {
   const [culturalFlavorOptions, setCulturalFlavorOptions] = useState<string[]>([]);
 
   const quickFilterOptions = ['High Protein', 'Low Calorie', 'High Fiber'];
-
-  useEffect(() => {
-    const flavors = Array.from(new Set(suggestedRecipes.map(r => r.culturalFlavor).filter(Boolean)));
-    setCulturalFlavorOptions(flavors as string[]);
-  }, [suggestedRecipes]);
 
   useEffect(() => {
     const flavors = Array.from(new Set(suggestedRecipes.map(r => r.culturalFlavor).filter(Boolean)));
@@ -106,7 +127,8 @@ const SnapAndSuggest = ({ addToWeeklyPlanner }: SnapAndSuggestProps) => {
 
       if (ingredients.length > 0) {
         toast.info('Generating recipe suggestions...');
-        const recipes = await generateRecipesFromIngredients(ingredients);
+        const ingredientNames = ingredients.map(i => i.item);
+        const recipes = await generateRecipesFromIngredients(ingredientNames);
         const sorted = [...recipes].sort((a, b) => (a.prepTime + a.cookTime) - (b.prepTime + b.cookTime));
         setSuggestedRecipes(sorted);
         toast.success(`Generated ${recipes.length} new recipes!`);
@@ -213,9 +235,9 @@ const SnapAndSuggest = ({ addToWeeklyPlanner }: SnapAndSuggestProps) => {
         <div className="space-y-4">
           <h3 className="text-xl font-semibold">Detected Ingredients ({detectedItems.length})</h3>
           <div className="flex flex-wrap gap-2">
-            {detectedItems.map((item, idx) => (
+            {detectedItems.map((ingredient, idx) => (
               <Badge key={idx} variant="secondary" className="px-3 py-1.5 text-sm font-medium">
-                {item}
+                {ingredient.item}
               </Badge>
             ))}
           </div>

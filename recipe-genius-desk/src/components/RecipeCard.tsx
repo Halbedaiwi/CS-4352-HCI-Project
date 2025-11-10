@@ -7,7 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 
 interface RecipeCardProps {
   recipe: Recipe;
-  compact?: boolean;
+  view?: 'default' | 'compact' | 'calendar';
   onViewDetails?: (recipe: Recipe) => void;
   onAddToWeeklyPlanner?: (recipe: Recipe) => void;
   isPlanning?: boolean;
@@ -20,7 +20,7 @@ interface RecipeCardProps {
 
 const RecipeCard = ({ 
   recipe, 
-  compact = false, 
+  view = 'default',
   onViewDetails, 
   onAddToWeeklyPlanner, 
   isPlanning = false, 
@@ -37,6 +37,51 @@ const RecipeCard = ({
       onViewDetails(recipe);
     }
   };
+
+  if (view === 'calendar') {
+    return (
+      <Card className="overflow-hidden flex flex-col h-full">
+        <div className="h-20 relative">
+          {recipe.image ? (
+            <img src={recipe.image} alt={recipe.name} className="w-full h-full object-cover" />
+          ) : (
+            <div className="w-full h-full bg-gradient-to-br from-primary/20 to-accent/20 flex items-center justify-center">
+              <span className="text-2xl opacity-30">🍽️</span>
+            </div>
+          )}
+        </div>
+        <CardHeader className="p-2 flex-grow">
+          <h4 className="font-semibold text-sm leading-tight">{recipe.name}</h4>
+        </CardHeader>
+        <CardFooter className="p-2 pt-0">
+          <div className="flex items-center gap-1 w-full">
+            <Select 
+              onValueChange={(value) => {
+                if (value === 'unassign') {
+                  onRemoveFromDay?.(recipe);
+                } else {
+                  onAssignDay?.(recipe, value);
+                }
+              }} 
+              value={assignedDay}
+            >
+              <SelectTrigger className="h-8">
+                <SelectValue placeholder="Assign" />
+              </SelectTrigger>
+              <SelectContent>
+                {daysOfWeek.map(day => (
+                  <SelectItem key={day} value={day} disabled={day === assignedDay}>{day}</SelectItem>
+                ))}
+                <SelectItem value="unassign">
+                  <span className="text-destructive">Remove</span>
+                </SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        </CardFooter>
+      </Card>
+    );
+  }
 
   return (
     <Card className="overflow-hidden hover:shadow-lg transition-all cursor-pointer group" onClick={handleCardClick}>
@@ -92,7 +137,7 @@ const RecipeCard = ({
         </div>
 
         {/* Tags */}
-        {!compact && (
+        {view !== 'compact' && (
           <div className="flex flex-wrap gap-1.5">
             {recipe.tags.slice(0, 3).map((tag, idx) => (
               <Badge key={idx} variant="secondary" className="text-xs">
