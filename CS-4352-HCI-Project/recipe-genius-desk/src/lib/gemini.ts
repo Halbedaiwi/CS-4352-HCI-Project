@@ -120,18 +120,24 @@ async function pickRecipeImage(recipe: Omit<Recipe, "id"> | Recipe): Promise<str
  * @param imageFiles array of image File objects
  * @returns resolves to an array of ingredient names detected in the images
  */
-export async function analyzeImages(imageFiles: File[]): Promise<string[]> {
+export async function analyzeImages(imageFiles: File[]): Promise<Array<{ item: string; quantity: string }>> {
   if (!API_KEY) {
     throw new Error("VITE_GEMINI_API_KEY is not set in .env.local");
   }
 
   const imageParts = await Promise.all(imageFiles.map(fileToGenerativePart));
 
-  const prompt =
-    "Analyze these images of a pantry, fridge, or countertop. Identify all the food ingredients you can see. Return only a comma-separated list of the ingredient names. For example: 'Canned Tomatoes,Onions,Garlic,Pasta'";
+  const prompt = `
+    Analyze these images of a pantry, fridge, or countertop. Identify all the food ingredients you can see.
+    Return a valid JSON array of objects, where each object has an "item" (string) and a "quantity" (string).
+    For example: [{"item": "Canned Tomatoes", "quantity": "2 cans"}, {"item": "Onion", "quantity": "1"}, {"item": "Garlic", "quantity": "1 bulb"}]
+  `;
 
   const requestBody = {
     contents: [{ parts: [{ text: prompt }, ...imageParts] }],
+    generationConfig: {
+      responseMimeType: "application/json",
+    },
   };
 
   console.log("Gemini API URL:", API_URL);
@@ -158,7 +164,15 @@ export async function analyzeImages(imageFiles: File[]): Promise<string[]> {
     return [];
   }
 
-  return text.split(',').map(item => item.trim()).filter(Boolean);
+  try {
+    const jsonString = stripMarkdownFences(text);
+    const ingredients = JSON.parse(jsonString);
+    return ingredients;
+  } catch (e) {
+    console.error("Failed to parse ingredients JSON:", e, { text });
+    // Fallback for comma-separated list for backward compatibility or if the model fails
+    return text.split(',').map(item => ({ item: item.trim(), quantity: '1' })).filter(i => i.item);
+  }
 }
 
 /**
@@ -377,4 +391,85 @@ export async function swapIngredient(recipe: Recipe, oldIngredient: string, newI
   const newId = uuidv4();
   const image = await pickRecipeImage(swapped);
   return { ...swapped, id: newId, image };
+}
+
+export async function generateMealPlan(
+  pantryInventory: Array<{ item: string; quantity: string }>,
+  goals: { budget: string; calories: string; protein: string; fiber: string }
+): Promise<any> {
+  if (!API_KEY) {
+    throw new Error("VITE_GEMINI_API_KEY is not set in .env.local");
+  }
+
+  const prompt = `
+    You are a meal planning assistant. Based on the user's goals and pantry inventory, generate a 7-day dinner meal plan.
+
+    User's Goals:
+    - Weekly Budget for missing items: ${goals.budget}
+    - Calories per meal: ~${goals.calories}
+    - Protein per meal: ~${goals.protein}g
+    - Fiber per meal: ~${goals.fiber}g
+
+    Pantry Inventory:
+    ${pantryInventory.map(i => `- ${i.item} (${i.quantity})`).join('\n')}
+
+    Instructions:
+    1. Generate 7 unique dinner recipes that align with the user's nutritional goals.
+    2. For each recipe, determine which ingredients are missing from the pantry.
+    3. For each recipe, create a shopping list of only the missing ingredients.
+    4. For each recipe, estimate the cost of its missing ingredients.
+    5. Calculate the total estimated cost for all missing ingredients across all 7 recipes.
+    6. Return a single valid JSON object with the following structure:
+    {
+      "recipes": [
+        {
+          "id": "...",
+          "name": "...",
+          "prepTime": ...,
+          "cookTime": ...,
+          "servings": ...,
+          "difficulty": "...",
+          "tags": ["..."],
+          "ingredients": [ { "item": "...", "amount": ..., "unit": "..." } ],
+          "nutrition": { "calories": ..., "protein": ..., "carbs": ..., "fiber": ... },
+          "steps": ["..."],
+          "culturalFlavor": "...",
+          "shoppingList": [ { "item": "...", "quantity": "..." } ],
+          "estimatedCost": "$X.XX"
+        }
+      ],
+      "totalEstimatedCost": "$XX.XX"
+    }
+  `;
+
+  const response = await fetch(TEXT_API_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      contents: [{ parts: [{ text: prompt }] }],
+      generationConfig: {
+        responseMimeType: "application/json",
+      },
+    }),
+  });
+
+  if (!response.ok) {
+    const errorBody = await response.json();
+    console.error("Gemini API Error:", errorBody);
+    throw new Error(`Failed to generate meal plan. Status: ${response.status}`);
+  }
+
+  const data = await response.json();
+  const raw = data.candidates?.[0]?.content?.parts?.[0]?.text || "";
+  const jsonString = stripMarkdownFences(raw);
+
+  try {
+    const plan = JSON.parse(jsonString);
+    // Assign UUIDs to the generated recipes, but skip image fetching for this plan
+    plan.recipes = plan.recipes.map((r: Omit<Recipe, 'id'>) => ({ ...r, id: uuidv4() }));
+    return plan;
+  } catch (e) {
+    console.error("Failed to parse meal plan JSON:", e, { jsonString });
+    throw new Error("The AI returned an invalid meal plan format.");
+  }
 }
