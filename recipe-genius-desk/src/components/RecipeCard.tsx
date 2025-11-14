@@ -1,0 +1,237 @@
+import { Card, CardContent, CardFooter, CardHeader } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { Clock, Users, Flame, Drumstick, Wheat, CalendarPlus, X } from 'lucide-react';
+import { Recipe } from '@/data/mockData';
+import { Button } from '@/components/ui/button';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+
+interface RecipeCardProps {
+  recipe: Recipe;
+  view?: 'default' | 'compact' | 'calendar';
+  onViewDetails?: (recipe: Recipe) => void;
+  onAddToWeeklyPlanner?: (recipe: Recipe) => void;
+  isPlanning?: boolean;
+  isPlanned?: boolean;
+  onAssignDay?: (recipe: Recipe, day: string) => void;
+  daysOfWeek?: string[];
+  assignedDay?: string;
+  onRemoveFromDay?: (recipe: Recipe) => void;
+  onRemoveFromPlanner?: (recipe: Recipe) => void;
+}
+
+const RecipeCard = ({ 
+  recipe, 
+  view = 'default',
+  onViewDetails, 
+  onAddToWeeklyPlanner, 
+  isPlanning = false, 
+  isPlanned = false,
+  onAssignDay, 
+  daysOfWeek = [],
+  assignedDay,
+  onRemoveFromDay,
+  onRemoveFromPlanner
+}: RecipeCardProps) => {
+  const totalTime = recipe.prepTime + recipe.cookTime;
+
+  const handleCardClick = () => {
+    if (!isPlanning && onViewDetails) {
+      onViewDetails(recipe);
+    }
+  };
+
+  if (view === 'calendar') {
+    return (
+      <Card className="overflow-hidden flex flex-col h-full dark:bg-gray-800 dark:border-gray-700">
+        <div className="h-20 relative">
+          {recipe.image ? (
+            <img src={recipe.image} alt={recipe.name} className="w-full h-full object-cover" />
+          ) : (
+            <div className="w-full h-full bg-gradient-to-br from-primary/20 to-accent/20 flex items-center justify-center">
+              <span className="text-2xl opacity-30">🍽️</span>
+            </div>
+          )}
+        </div>
+        <CardHeader className="p-2 flex-grow">
+          <h4 className="font-semibold text-sm leading-tight dark:text-white">{recipe.name}</h4>
+        </CardHeader>
+        <CardFooter className="p-2 pt-0">
+          <div className="flex items-center gap-1 w-full">
+            <Select 
+              onValueChange={(value) => {
+                if (value === 'unassign') {
+                  onRemoveFromDay?.(recipe);
+                } else {
+                  onAssignDay?.(recipe, value);
+                }
+              }} 
+              value={assignedDay}
+            >
+              <SelectTrigger className="h-8">
+                <SelectValue placeholder="Assign" />
+              </SelectTrigger>
+              <SelectContent>
+                {daysOfWeek.map(day => (
+                  <SelectItem key={day} value={day} disabled={day === assignedDay}>{day}</SelectItem>
+                ))}
+                <SelectItem value="unassign">
+                  <span className="text-destructive">Remove</span>
+                </SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        </CardFooter>
+      </Card>
+    );
+  }
+
+  return (
+    <Card className="overflow-hidden hover:shadow-lg transition-all cursor-pointer group dark:bg-gray-800 dark:border-gray-700 dark:hover:shadow-gray-600" onClick={handleCardClick}>
+      <div className="h-32 bg-gradient-to-br from-primary/20 to-accent/20 flex items-center justify-center relative overflow-hidden">
+        {recipe.image ? (
+          <img src={recipe.image} alt={recipe.name} className="w-full h-full object-cover" />
+        ) : (
+          <div className="text-4xl opacity-30 group-hover:scale-110 transition-transform">
+            🍽️
+          </div>
+        )}
+        {recipe.culturalFlavor && (
+          <Badge className="absolute top-2 right-2 bg-card/80 backdrop-blur-sm dark:bg-gray-700 dark:text-gray-300">
+            {recipe.culturalFlavor}
+          </Badge>
+        )}
+      </div>
+
+      <CardHeader className="pb-3">
+        <div className="space-y-2">
+          <h3 className="font-semibold text-lg leading-tight dark:text-white">{recipe.name}</h3>
+          <div className="flex items-center gap-3 text-sm text-muted-foreground dark:text-gray-300">
+            <div className="flex items-center gap-1">
+              <Clock className="h-3.5 w-3.5" />
+              <span>{totalTime}min</span>
+            </div>
+            <div className="flex items-center gap-1">
+              <Users className="h-3.5 w-3.5" />
+              <span>{recipe.servings}</span>
+            </div>
+          </div>
+        </div>
+      </CardHeader>
+
+      <CardContent className="pb-3">
+        {/* Nutrition Snippet */}
+        <div className="grid grid-cols-3 gap-2 mb-3 p-2 bg-muted rounded-lg dark:bg-gray-700">
+          <div className="text-center">
+            <Flame className="h-4 w-4 mx-auto mb-1 text-nutrition-calories" />
+            <p className="text-xs font-semibold dark:text-white">{recipe.nutrition.calories}</p>
+            <p className="text-[10px] text-muted-foreground dark:text-gray-300">kCal</p>
+          </div>
+          <div className="text-center">
+            <Drumstick className="h-4 w-4 mx-auto mb-1 text-nutrition-protein" />
+            <p className="text-xs font-semibold dark:text-white">{recipe.nutrition.protein}g</p>
+            <p className="text-[10px] text-muted-foreground dark:text-gray-300">Protein</p>
+          </div>
+          <div className="text-center">
+            <Wheat className="h-4 w-4 mx-auto mb-1 text-nutrition-fiber" />
+            <p className="text-xs font-semibold dark:text-white">{recipe.nutrition.fiber}g</p>
+            <p className="text-[10px] text-muted-foreground dark:text-gray-300">Fiber</p>
+          </div>
+        </div>
+
+        {/* Tags */}
+        {view !== 'compact' && (
+          <div className="flex flex-wrap gap-1.5">
+            {recipe.tags.slice(0, 3).map((tag, idx) => (
+              <Badge key={idx} variant="secondary" className="text-xs dark:bg-gray-700 dark:text-gray-300">
+                {tag}
+              </Badge>
+            ))}
+          </div>
+        )}
+      </CardContent>
+
+      <CardFooter className="pt-0 flex-col gap-2">
+        {onViewDetails && (
+          <Button 
+            variant="outline" 
+            size="sm" 
+            className="w-full"
+            onClick={(e) => {
+              e.stopPropagation();
+              onViewDetails(recipe);
+            }}
+          >
+            View Details
+          </Button>
+        )}
+        {onAddToWeeklyPlanner && !isPlanning && (
+            <Button
+                variant={isPlanned ? "default" : "outline"}
+                size="sm"
+                disabled={isPlanned}
+                className={`w-full ${isPlanned ? 'bg-green-500 hover:bg-green-600' : ''}`}
+                onClick={(e) => {
+                    e.stopPropagation();
+                    onAddToWeeklyPlanner(recipe);
+                }}
+            >
+                <CalendarPlus className="mr-2 h-4 w-4" />
+                {isPlanned ? 'Added to Planner' : 'Add to Weekly Planner'}
+            </Button>
+        )}
+        {isPlanning && onAssignDay && !assignedDay && (
+          <div className="flex items-center gap-2 w-full">
+            <Select onValueChange={(day) => onAssignDay(recipe, day)} value={assignedDay}>
+              <SelectTrigger>
+                <SelectValue placeholder="Assign to a day" />
+              </SelectTrigger>
+              <SelectContent>
+                {daysOfWeek.map(day => (
+                  <SelectItem key={day} value={day} disabled={day === assignedDay}>{day}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            {onRemoveFromPlanner &&
+              <Button
+                variant="outline"
+                size="icon"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onRemoveFromPlanner(recipe);
+                }}
+              >
+                <X className="h-4 w-4" />
+              </Button>
+            }
+          </div>
+        )}
+        {isPlanning && assignedDay && onRemoveFromDay && (
+          <div className="flex items-center gap-2 w-full">
+            <Select onValueChange={(day) => onAssignDay(recipe, day)} value={assignedDay}>
+              <SelectTrigger>
+                <SelectValue placeholder="Assign to a day" />
+              </SelectTrigger>
+              <SelectContent>
+                {daysOfWeek.map(day => (
+                  <SelectItem key={day} value={day} disabled={day === assignedDay}>{day}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Button
+              variant="outline"
+              size="icon"
+              onClick={(e) => {
+                e.stopPropagation();
+                onRemoveFromDay(recipe);
+              }}
+            >
+              <X className="h-4 w-4" />
+            </Button>
+          </div>
+        )}
+      </CardFooter>
+    </Card>
+  );
+};
+
+export default RecipeCard;

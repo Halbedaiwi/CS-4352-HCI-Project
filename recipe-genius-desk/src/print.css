@@ -1,0 +1,26 @@
+@media print {
+  /* Hide everything by default */
+  body * {
+    visibility: hidden;
+  }
+
+  /* Show the printable area and its children */
+  .printable-area, .printable-area * {
+    visibility: visible;
+  }
+
+  /* Position the printable area at the top of the page */
+  .printable-area {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+  }
+
+  /* Hide elements that should not be printed */
+  header,
+  [role="tablist"],
+  .non-printable {
+    display: none !important;
+  }
+}
