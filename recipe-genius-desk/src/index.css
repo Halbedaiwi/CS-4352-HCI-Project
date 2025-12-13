@@ -139,3 +139,16 @@ All colors MUST be HSL.
     @apply bg-background text-foreground;
   }
 }
+
+@keyframes flash-green {
+  0%, 100% {
+    background-color: transparent;
+  }
+  50% {
+    background-color: hsl(150 35% 35% / 0.3);
+  }
+}
+
+.flash-green {
+  animation: flash-green 1.5s infinite;
+}

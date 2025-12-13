@@ -1,5 +1,7 @@
 import { v4 as uuidv4 } from 'uuid';
 import type { Recipe, NutritionInfo } from '@/data/mockData';
+import {toast} from "sonner";
+
 
 const API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
 const PEXELS_API_KEY = import.meta.env.VITE_PEXELS_API_KEY;
@@ -34,22 +36,22 @@ function stripMarkdownFences(s: string | undefined): string {
 }
 
 
-// Pexels api is good for image searching for recipe cards
+// we have to switch to Pixabay bc Pexles changed police where we cant coll from localhost, has to be from a backend
 async function searchPexelsImage(query: string): Promise<string | undefined> {
   console.log("Searching for image with query:", query);
   if (!PEXELS_API_KEY) {
     console.error("PEXELS_API_KEY is not set. Cannot fetch images.");
     return undefined;
   }
-  const url = new URL("https://api.pexels.com/v1/search");
-  url.searchParams.set("query", query);
-  url.searchParams.set("per_page", "10"); // a few options to rank
-  url.searchParams.set("orientation", "landscape");
+  const url = new URL("https://pixabay.com/api/");
+  url.searchParams.set("key", PEXELS_API_KEY);
+  url.searchParams.set("image_type", "photo"); 
+  url.searchParams.set("orientation", "horizontal");
+  url.searchParams.set("per_page", "10");
+  url.searchParams.set("q", query); // pic search query
 
   try {
-    const res = await fetch(url.toString(), {
-      headers: { Authorization: PEXELS_API_KEY },
-    });
+    const res = await fetch(url.toString());
 
     if (!res.ok) {
       console.warn("Pexels API error", res.status, await res.text());
@@ -57,27 +59,19 @@ async function searchPexelsImage(query: string): Promise<string | undefined> {
     }
 
     type PexelsPhoto = {
-      src: {
-        original: string;
-        large2x: string;
-        large: string;
-        medium: string;
-        landscape: string;
-      };
-      alt?: string;
+      hits: { largeImageURL: string; webformatURL: string }[];
     };
-    type PexelsResp = { photos: PexelsPhoto[] };
+   // type PexelsResp = { photos: PexelsPhoto[] };
 
-    const data = (await res.json()) as PexelsResp;
-    if (!data?.photos?.length) {
+    const data = (await res.json()) as PexelsPhoto;
+    if (!data?.hits?.length) {
       console.log("No images found for query:", query);
       return undefined;
     }
 
     // prefer landscape, then large, then original
-    const top = data.photos[0];
-    const candidate =
-      top.src?.landscape || top.src?.large || top.src?.large2x || top.src?.original;
+    const top = data.hits[0];
+    const candidate = top.largeImageURL || top.webformatURL;
     console.log("Found image:", candidate);
     return candidate;
   } catch (error) {
@@ -130,8 +124,15 @@ export async function analyzeImages(imageFiles: File[]): Promise<Array<{ item: s
   const prompt = `
     Analyze these images of a pantry, fridge, or countertop. Identify all the food ingredients you can see.
     Return a valid JSON array of objects, where each object has an "item" (string) and a "quantity" (string).
-    For example: [{"item": "Canned Tomatoes", "quantity": "2 cans"}, {"item": "Onion", "quantity": "1"}, {"item": "Garlic", "quantity": "1 bulb"}]
-  `;
+
+    IMPORTANT: The "quanity" string MUST ALWAYS start with a number representing a specific count. Do not use vague estimates like.
+     - Correct format for "quantity": "2 cups", "1 can", "3 bags"
+     - Incorrect format for "quantity": "a few jars", "a few", "a lot"
+
+    For example, the final output should look like this: 
+    [{"item": "Canned Tomatoes", "quantity": "2 cans"}, {"item": "Onion", "quantity": "1"}, {"item": "Garlic", "quantity": "1 bulb"}]
+
+    `;
 
   const requestBody = {
     contents: [{ parts: [{ text: prompt }, ...imageParts] }],
@@ -175,19 +176,35 @@ export async function analyzeImages(imageFiles: File[]): Promise<Array<{ item: s
   }
 }
 
+
+// making this a function so we can call it inthe auto plan section. 
+    function getRestrictions(restrictions: string[]): string {
+    if (restrictions && restrictions.length > 0 && !restrictions.includes('None')) { // checks if user actually clicked smthn, else nothin
+        return `
+        IMPORTANT: Make sure you adhere to the following dietary restrictions: ${restrictions.join(', ')}.
+        Ensure all generated recipes strictly follow these requirements.
+        `;
+      }
+      return '';
+    }
+
+
+
 /**
  * @param ingredients array of ingredient names
  * @returns promises to an array of generated Recipe objects
  */
-export async function generateRecipesFromIngredients(ingredients: string[]): Promise<Recipe[]> {
+export async function generateRecipesFromIngredients(ingredients: string[], restrictions: string[]): Promise<Recipe[]> { // add the new parameter
   if (!API_KEY) {
     throw new Error("VITE_GEMINI_API_KEY is not set in .env.local");
   }
 
+    let restrictionsInstruction = getRestrictions(restrictions);
+
   const prompt = `
     Based on the following ingredients: ${ingredients.join(', ')}.
     Generate 8 recipe suggestions that are tailored for dinner.
-
+    ${restrictionsInstruction}
     IMPORTANT:
     - Do NOT include any image URLs in the output. Leave "image" empty or omit it.
     - The response MUST be a valid JSON array of Recipe objects (no extra text).
@@ -351,12 +368,32 @@ export async function swapIngredient(recipe: Recipe, oldIngredient: string, newI
     ${JSON.stringify(recipe, null, 2)}
 
     Swap the ingredient "${oldIngredient}" with "${newIngredient}".
-    Please update the ingredients list and the instructions to reflect this change.
+    Please update the ingredients list, instructions, and nutrition to reflect this change.
     The amounts of other ingredients and the steps should be adjusted logically to accomodate the new ingredient.
 
     IMPORTANT:
-    - Do NOT include an image URL. Leave "image" empty or omit it; the system will add one.
-    - Return a single valid JSON object (no extra text) matching the Recipe interface.
+    - The response MUST be a single valid JSON object with NO extra text or markdown.
+    - The JSON object must have two-level keys: "recipe" and "warning".
+    - The "recipe" key must contain a valid Recipe object. DoNOT include an image URL; leave "image empty or omit it.
+    - The "warning" key must contain a string with a warning message if "${newIngredient}" is poisonous, toxic, or otherwise not fit for consumption. If there is no warning, this key should be null or empty string.
+
+    CRITICAL SAFTEY INSTRUCTIONS:
+    - If "${newIngredient}" is known to be poisonous, toxic, or unsafe for consumption, you must still modify the recipe, but with extreme caution.
+    - In the recipe steps, add a warning like "CAUTION: Handle with care."
+    - Adjust the ingredient amount to a minimal quantity, examples are: "a pinch" or "1 drop".
+
+    Example response format:
+    {
+      "recipe": {
+        "name": "...",
+        "ingerdients": [{"item: Comfrey", "amount": 1, "unit": "drop"}],
+        "steps": [
+          "Step 1: Cut all vegtables.",
+          "Step 2: CAUTION: Add 1 drop of Comfrey. Handle with care.",]
+        // ... other recipe fields
+      },
+      "warning": "Warning: This ingredient is not safe for consumption."
+    }
   `;
 
   const response = await fetch(TEXT_API_URL, {
@@ -380,35 +417,71 @@ export async function swapIngredient(recipe: Recipe, oldIngredient: string, newI
   const raw = data.candidates?.[0]?.content?.parts?.[0]?.text || "";
   const jsonString = stripMarkdownFences(raw);
 
-  let swapped: Omit<Recipe, 'id'>;
+  type SwapResponse = { // new response structure w/ recipe + warning
+    recipe: Omit<Recipe, 'id'>;
+    warning: string | null; // saftey warning is poisnous
+  };
+
+  let smartSwapResponseForWarning: SwapResponse; // new parsed response
   try {
-    swapped = JSON.parse(jsonString);
+    smartSwapResponseForWarning = JSON.parse(jsonString);
   } catch (e) {
-    console.error("Failed to parse swapped recipe JSON:", e, { jsonString });
-    throw new Error("The AI returned an invalid recipe format during ingredient swap.");
+    console.error("Can't parse JSON:", e, { jsonString });
+    throw new Error("The AI returned an invalid format during ingredient swap.");
   }
+
+  // check for and display safety warnings via toast
+  if (smartSwapResponseForWarning.warning) {
+    toast.warning(smartSwapResponseForWarning.warning);
+  }
+
+  const swapped = smartSwapResponseForWarning.recipe;
+  if (!swapped) { // make sure recipe still exits
+    throw new Error("missing recipe object");
+  }
+
 
   const newId = uuidv4();
   const image = await pickRecipeImage(swapped);
   return { ...swapped, id: newId, image };
 }
 
+
+
 export async function generateMealPlan(
   pantryInventory: Array<{ item: string; quantity: string }>,
-  goals: { budget: string; calories: string; protein: string; fiber: string }
+  goals: { budget: string; calories: string; protein: string; fiber: string },
+  restrictions: string[],
 ): Promise<any> {
   if (!API_KEY) {
     throw new Error("VITE_GEMINI_API_KEY is not set in .env.local");
   }
 
+  let restrictionsInstruction = getRestrictions(restrictions);
+
+
   const prompt = `
-    You are a meal planning assistant. Based on the user's goals and pantry inventory, generate a 7-day dinner meal plan.
+    You are a meal planning assistant. Based on the user's goals and pantry inventory, generate a 7-day dinner meal plan. 
+    ${restrictionsInstruction}
 
     User's Goals:
     - Weekly Budget for missing items: ${goals.budget}
     - Calories per meal: ~${goals.calories}
     - Protein per meal: ~${goals.protein}g
     - Fiber per meal: ~${goals.fiber}g
+
+    *IMPORTANT VALIDATION RULE*:
+    Before you begin, you MUST check the user's goals listed above. 
+    If ANY of the values for budget, calories, protein, or fiber are zero, negative, or unrealistic
+    (e.g., budget less than $10, 1 calorie, etc.), DO NOT generate recipes.
+    Instead, you MUST return a JSON object structured like this, with an empty "recipes" array and a specific error
+    in "totalEstimatedCost":
+    {
+      "recipes": [],
+      "totalEstimatedCost": "ERROR Invalid or unrealistic values provided"
+    }
+
+    Only if all goal values are posotive and realistic should you proceed to generate the 7-day meal plan as described below.
 
     Pantry Inventory:
     ${pantryInventory.map(i => `- ${i.item} (${i.quantity})`).join('\n')}

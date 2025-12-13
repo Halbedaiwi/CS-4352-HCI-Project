@@ -167,7 +167,7 @@ const RecipeDetail = ({ recipe: initialRecipe, onBack, onStartCooking }: RecipeD
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                       <Select onValueChange={setIngredientToReplace} value={ingredientToReplace}>
                         <SelectTrigger>
-                          <SelectValue placeholder="Select ingredient" />
+                          <SelectValue placeholder="Select ingredient (ex. Bell Pepper)" /> 
                         </SelectTrigger>
                         <SelectContent>
                           {recipe.ingredients.map((ing, idx) => (
@@ -176,7 +176,7 @@ const RecipeDetail = ({ recipe: initialRecipe, onBack, onStartCooking }: RecipeD
                         </SelectContent>
                       </Select>
                       <Input
-                        placeholder="New ingredient"
+                        placeholder="New ingredient (ex. Zucchini)"
                         value={newIngredient}
                         onChange={(e) => setNewIngredient(e.target.value)}
                       />

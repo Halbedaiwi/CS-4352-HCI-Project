@@ -17,6 +17,7 @@ const Index = () => {
   const { theme, setTheme } = useTheme();
   const [plannedRecipes, setPlannedRecipes] = useState<Recipe[]>([]);
   const [schedule, setSchedule] = useState<WeeklySchedule>({});
+  const [newMealAdded, setNewMealAdded] = useState(false); // new state we are adding to see if user added meal to planner
 
   // State lifted from SnapAndSuggest
   const [imageFiles, setImageFiles] = useState<File[]>([]);
@@ -32,7 +33,7 @@ const Index = () => {
   const handleReset = () => {
     setPlannedRecipes([]);
     setSchedule({});
-    // Clear lifted state
+    setNewMealAdded(false);
     setImageFiles([]);
     setImagePreviews([]);
     setDetectedItems([]);
@@ -50,6 +51,7 @@ const Index = () => {
       toast.warning(`${recipe.name} is already in the weekly planner.`);
     } else {
       setPlannedRecipes(prev => [...prev, recipe]);
+      setNewMealAdded(true); // true so plan the week tab can highlight green
       toast.success(`${recipe.name} added to weekly planner!`);
     }
   };
@@ -59,15 +61,30 @@ const Index = () => {
     toast.success(`${recipe.name} removed from weekly planner!`);
   };
 
-  const handleGeneratePlan = async (goals: { budget: string; calories: string; protein: string; fiber: string }) => {
+  const handleGeneratePlan = async (goals: { budget: string; calories: string; protein: string; fiber: string, restrictions: string[] }) => {
     try {
-      const plan = await generateMealPlan(detectedItems, goals);
+      const {restrictions, ...otherGoals} = goals;
+
+      // update with local storage so restrictions array saves over to plan th week tab
+      const savedRestrictionsJSON = localStorage.getItem('dietaryRestrictions');
+      const savedRestrictions = savedRestrictionsJSON ? JSON.parse(savedRestrictionsJSON) : [];
+
+      const plan = await generateMealPlan(detectedItems, otherGoals, savedRestrictions);
       setGeneratedPlan(plan);
       return plan;
     } catch (e: unknown) {
       const message = e instanceof Error ? e.message : 'An unknown error occurred.';
       toast.error('Failed to generate meal plan', { description: message });
       return null;
+    }
+  };
+
+  // task for akram:
+  // make a function so when user just clicks on the plan the week tab when its flashing, it will stop flashing
+  // probly use smthn like a flag to keep track of when its flashin or not
+  const handleTabChange = (value: string) => {
+    if (value === 'plan-the-week') {
+      setNewMealAdded(false);
     }
   };
 
@@ -101,10 +118,15 @@ const Index = () => {
       </header>
 
       <main className="container mx-auto px-6 py-8">
-        <Tabs defaultValue="snap-and-suggest">
+        <Tabs defaultValue="snap-and-suggest" onValueChange={handleTabChange}>
           <TabsList>
             <TabsTrigger value="snap-and-suggest">Snap & Suggest</TabsTrigger>
-            <TabsTrigger value="plan-the-week">Plan the Week</TabsTrigger>
+            <TabsTrigger
+              value="plan-the-week"
+              className={newMealAdded ? 'flash-green' : ''} // flash green if new meal added to signal user to click thr
+            >
+              Plan the Week
+            </TabsTrigger>
           </TabsList>
           <TabsContent value="snap-and-suggest" className="non-printable">
             <SnapAndSuggest

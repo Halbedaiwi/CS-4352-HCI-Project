@@ -12,6 +12,7 @@ import RecipeDetail from './RecipeDetail';
 import { toast } from 'sonner';
 import { analyzeImages, generateRecipesFromIngredients, Recipe } from '@/lib/gemini';
 import { AlertCircle, Camera, Loader2, Upload, X } from 'lucide-react';
+import { UserRestrictions } from './UserRestrictions';
 
 interface SnapAndSuggestProps {
   plannedRecipes: Recipe[];
@@ -63,6 +64,24 @@ const SnapAndSuggest = ({
   const [filteredRecipes, setFilteredRecipes] = useState<Recipe[]>([]);
   const [culturalFlavorOptions, setCulturalFlavorOptions] = useState<string[]>([]);
 
+  // need to use local storage bc of goals & atuo plan feature
+  // whatever restriction user puts it needs to save accross the diff tabs
+  const [foodRestrictions, setFoodRestrictions] = useState<string[]>(() => {
+  const saved = localStorage.getItem('dietaryRestrictions');
+  return saved ? JSON.parse(saved) : [];
+});
+// effect hook to see if restriction ever change
+  useEffect(() => {
+  localStorage.setItem('dietaryRestrictions', JSON.stringify(foodRestrictions));
+}, [foodRestrictions]);      
+
+  // task for zohaib:
+  // make the function to handle the chaged from the checkboxs for the restriction feature
+  const restrictionCahange = (restriction: string)=>{
+  setFoodRestrictions(prev => prev.includes(restriction) ? 
+  prev.filter( r=>r !== restriction)
+    : [...prev, restriction]);;;
+  }
   const quickFilterOptions = ['High Protein', 'Low Calorie', 'High Fiber'];
 
   // Add progress state
@@ -156,11 +175,12 @@ const SnapAndSuggest = ({
         setScanProgress(65);
         await new Promise(resolve => setTimeout(resolve, 300));
 
-        setScanStatus('Matching ingredients with recipes...');
+        setScanStatus('Matching the ingredients below with recipes. This will take a moment...');
         setScanProgress(75);
 
         const ingredientNames = ingredients.map(i => i.item);
-        const recipes = await generateRecipesFromIngredients(ingredientNames);
+        //const recipes = await generateRecipesFromIngredients(ingredientNames); (old version) w/o restricns
+        const recipes = await generateRecipesFromIngredients(ingredientNames, foodRestrictions); // new version with restrictions
         
         setScanStatus('Sorting and optimizing recipes...');
         setScanProgress(90);
@@ -221,16 +241,21 @@ const SnapAndSuggest = ({
       />
     );
   }
-
+// task for yafi:
+// change the tailwind for the "upload photos of your ingredients" part and "snap upload and cook"
+// put snap upload and cook in the top left corner like refine results, and make the upload photos instructions part more prominient in the cetner
   return (
     <div className="space-y-8">
-      {/* Upload Section */}
-      <Card className="p-8 border-2 border-dashed border-border hover:border-primary transition-colors dark:bg-gray-800 dark:border-gray-700">
-        <div className="space-y-6">
+      {/* Upload Section (change the y-6 div to be flexible countainer)*/}
+      <Card className="p-8 border-2 border-dashed border-border hover:border-primary transition-colors dark:bg-gray-800 dark:border-gray-700 relative">
+        <h2 className="absolute top-2 left-2 text-sm text-black dark:text-white">Snap, Upload, and Cook</h2>
+        <div className="flex flex-col md:flex-row gap-8"> 
+        <div className="flex-1 space-y-6">
           <div className="text-center">
-            <h2 className="text-2xl font-semibold mb-2 dark:text-white">Snap, Upload, and Cook</h2>
-            <p className="text-muted-foreground dark:text-gray-300">
-              Upload photos of your ingredients, and let AI find the perfect recipe for you.
+            <p className="text-xl text-black dark:text-white font-bold">
+              Upload photos of your ingredients,
+              <br />
+              and let AI find the perfect recipe for you.
             </p>
           </div>
 
@@ -284,6 +309,10 @@ const SnapAndSuggest = ({
             </div>
           )}
         </div>
+        <div className="w-full md:w-80">
+          <UserRestrictions chosenRestrictions = {foodRestrictions} restrictionChange = {restrictionCahange}/>
+          </div>
+        </div>
       </Card>
 
       {error && (
@@ -315,9 +344,9 @@ const SnapAndSuggest = ({
           <Card className="p-6 bg-sage-light dark:bg-gray-800">
             <h3 className="text-xl font-semibold mb-4 dark:text-white">Refine Results</h3>
             <div className="flex flex-col gap-6">
-              {/* Max Time Filter */}
+              {/* Max Time Filter (bold it so its more noticiable (dp4 sugestion) */}
               <div>
-                <h4 className="font-medium mb-2 dark:text-white">Max Time</h4>
+                <h4 className="text-lg font-bold mb-2 dark:text-white">Max Time</h4> 
                 <div className="flex flex-wrap gap-2">
                   <Button
                     variant={maxTime === 15 ? 'default' : 'outline'}
@@ -343,9 +372,9 @@ const SnapAndSuggest = ({
                 </div>
               </div>
 
-              {/* Quick Filters */}
+              {/* Quick Filters (bold it so its more noticiable (dp4 sugestion) */}
               <div>
-                <h4 className="font-medium mb-2 dark:text-white">Quick Filters</h4>
+                <h4 className="text-lg font-bold mb-2 dark:text-white">Quick Filters</h4>
                 <div className="flex flex-col gap-2">
                   {quickFilterOptions.map(filter => (
                     <div key={filter} className="flex items-center">
@@ -366,9 +395,9 @@ const SnapAndSuggest = ({
                 </div>
               </div>
 
-              {/* Cultural Flavor Filter */}
+              {/* Cultural Flavor Filter (bold it so its more noticiable (dp4 sugestion) */}
               <div>
-                <h4 className="font-medium mb-2 dark:text-white">Cultural Flavor</h4>
+                <h4 className="text-lg font-bold mb-2 dark:text-white">Cultural Flavor</h4>
                 <div className="flex flex-wrap gap-2">
                   {culturalFlavorOptions.map(flavor => (
                     <Button
